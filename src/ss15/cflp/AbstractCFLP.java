@@ -1,17 +1,17 @@
 package ss15.cflp;
 
 /**
- * Abstrakte Klasse zum Berechnen der L&ouml;sung mittels Branch-and-Bound.
+ * Abstrakte Klasse zum Berechnen der Lösung mittels Branch-and-Bound.
  * 
  * <p>
- * <b>WICHTIG:</b> Nehmen Sie keine &Auml;nderungen in dieser Klasse vor. Bei
- * der Abgabe werden diese &Auml;nderungen verworfen und es k&ouml;nnte dadurch
+ * <b>WICHTIG:</b> Nehmen Sie keine Änderungen in dieser Klasse vor. Bei
+ * der Abgabe werden diese Änderungen verworfen und es könnte dadurch
  * passieren, dass Ihr Programm somit nicht mehr korrekt funktioniert.
  * </p>
  */
 public abstract class AbstractCFLP implements Runnable {
 	
-	/** Die bisher beste L&ouml;sung */
+	/** Die bisher beste Lösung */
 	private BnBSolution bestBnBSolution;
 
 	final public synchronized boolean setSolution(int newUpperBound, int[] newSolution) {
@@ -23,9 +23,9 @@ public abstract class AbstractCFLP implements Runnable {
 	}
 	
 	/**
-	 * Gibt die bisher beste gefundene L&ouml;sung zur&uuml;ck.
+	 * Gibt die bisher beste gefundene Lösung zur&uuml;ck.
 	 * 
-	 * @return Die bisher beste gefundene L&ouml;sung.
+	 * @return Die bisher beste gefundene Lösung.
 	 */
 	final public BnBSolution getBestSolution() {
 		return bestBnBSolution;
@@ -49,7 +49,7 @@ public abstract class AbstractCFLP implements Runnable {
 		}
 
 		/**
-		 * @return Die Items der bisher besten L&ouml;sung
+		 * @return Die Items der bisher besten Lösung
 		 */
 		public int[] getBestSolution() {
 			return customersToFacility.clone();

@@ -1,4 +1,4 @@
-package ss15.cflp;
+package ads2.ss15.cflp;
 
 /**
  * Abstrakte Klasse zum Berechnen der Lösung mittels Branch-and-Bound.

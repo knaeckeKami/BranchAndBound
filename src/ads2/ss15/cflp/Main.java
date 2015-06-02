@@ -1,13 +1,10 @@
-package ss15.cflp;
+package ads2.ss15.cflp;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Scanner;
 
 /**

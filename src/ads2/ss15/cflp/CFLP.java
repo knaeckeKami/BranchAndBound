@@ -1,7 +1,5 @@
-package ss15.cflp;
+package ads2.ss15.cflp;
 
-import javax.swing.*;
-import java.lang.reflect.Array;
 import java.util.*;
 
 /**
@@ -16,31 +14,54 @@ public class CFLP extends AbstractCFLP {
 	private CFLPInstance instance;
 
 
-	private int sum_bandwidth_customers=0;
-	private int min_num_facilities;
-	private LinkedHashMap<Integer, TreeSet<Integer>> bestFacilitiesForCostumer;
+	private int[][] bestFacilities;
+	private Integer[] biggestCustomers;
 
 	public CFLP(final CFLPInstance instance) {
+		LinkedHashMap<Integer, ArrayList<Integer>> bestFacilitiesForCostumer;
 
 		// TODO: Hier ist der richtige Platz fuer Initialisierungen
 		this.instance = instance;
 		//TODO test this magic
-		bestFacilitiesForCostumer = new LinkedHashMap<Integer, TreeSet<Integer>>();
+		bestFacilitiesForCostumer = new LinkedHashMap<Integer, ArrayList<Integer>>();
 		System.out.println(instance.distances.length+ " " + instance.getNumCustomers());
 		for(int i =0 ; i < instance.getNumCustomers(); i++){
 			final int finalI = i;
-			TreeSet<Integer> magicTreeSet = new TreeSet<Integer>(new Comparator<Integer>() {
+			ArrayList<Integer> magicList = new ArrayList<Integer>();
+			for(int j= 0; j < instance.getNumFacilities(); j++){
+				magicList.add(j);
+			}
+			Collections.sort(magicList, new Comparator<Integer>() {
 				@Override
 				public int compare(Integer o1, Integer o2) {
-					System.out.println(finalI+" "+o1 + " "+ o2);
-					return Integer.compare(instance.distances[o1][finalI], instance.distances[o2][finalI]);
+					System.out.println(finalI + " " + o1 + " " + o2);
+					return CFLP.compare(instance.distances[o1][finalI], instance.distances[o2][finalI]);
 				}
 			});
-			for(int j= 0; j < instance.getNumFacilities(); j++){
-				magicTreeSet.add(j);
-			}
-			bestFacilitiesForCostumer.put(i,magicTreeSet);
+			bestFacilitiesForCostumer.put(i,magicList);
 		}
+		//convert data structure back to array for max performance
+		bestFacilities = new int[instance.getNumCustomers()][instance.getNumFacilities()];
+		for (int i = 0; i < instance.getNumCustomers() ; i++) {
+			int j=0;
+			for (int facility : bestFacilitiesForCostumer.get(i)){
+				bestFacilities[i][j++] = facility;
+			}
+
+		}
+
+		biggestCustomers = new Integer[instance.getNumCustomers()];
+		for (int i = 0; i <  biggestCustomers.length; i++) {
+			biggestCustomers[i] = i;
+		}
+		Arrays.sort(biggestCustomers, new Comparator<Integer>() {
+			@Override
+			public int compare(Integer o1, Integer o2) {
+				return CFLP.compare(instance.bandwidthOf(o2), instance.bandwidthOf(o1));
+			}
+		});
+
+
 		System.out.println(bestFacilitiesForCostumer.toString());
 
 
@@ -66,6 +87,8 @@ public class CFLP extends AbstractCFLP {
 	 */
 	@Override
 	public void run() {
+		Main.printDebug("num customers " + instance.getNumCustomers());
+		Main.printDebug("num facilities " + instance.getNumFacilities());
 		int[] solution = new int[instance.getNumCustomers()];
 		int[] bandwidthAvailable = new int[instance.getNumFacilities()];
 		int[] customerSlotsAvailable = instance.maxCustomers.clone();
@@ -82,7 +105,17 @@ public class CFLP extends AbstractCFLP {
 		//System.out.println(Arrays.toString(solution));
 		int newLowerBound = instance.calcObjectiveValue(solution);
 		for(int i = solutionSize+1; i < instance.distances.length; i++){
-			newLowerBound+=min(instance.distances[i])*instance.distanceCosts;
+			int indexOfSmallestPossibleFacilty = 0;
+			int smallestPossibleFacility = bestFacilities[i][indexOfSmallestPossibleFacilty];
+			while(bandwidthAvailable[smallestPossibleFacility] < instance.bandwidthOf(i) ||
+					customerSlosAvailable[i] == 0){
+				indexOfSmallestPossibleFacilty++;
+				if(indexOfSmallestPossibleFacilty == instance.getNumFacilities()){
+					return;
+				}
+				smallestPossibleFacility = bestFacilities[i][indexOfSmallestPossibleFacilty];
+			}
+			newLowerBound+=min(instance.distances[smallestPossibleFacility])*instance.distanceCosts;
 
 		}
 
@@ -98,15 +131,14 @@ public class CFLP extends AbstractCFLP {
 			Main.printDebug("too bad!");
 			return;
 		}
-		//branching
+
 		solutionSize++;
 		if(solutionSize == solution.length){
-
+			setSolution(instance.calcObjectiveValue(solution),solution);
 			return;
 		}
-
-
-		for (int i : bestFacilitiesForCostumer.get(solutionSize)){
+		//branching
+		for (int i : bestFacilities[solutionSize]){
 			if(customerSlosAvailable[i] > 0 && bandwidthAvailable[i] >= instance.bandwidthOf(solutionSize)) {
 				int[] copySolution = solution.clone();
 				copySolution[solutionSize] = i;
@@ -114,7 +146,7 @@ public class CFLP extends AbstractCFLP {
 				int[] newCustomerSlotsAvailable = customerSlosAvailable.clone();
 				newBandWidthAvailable[i] -= instance.bandwidthOf(solutionSize);
 				newCustomerSlotsAvailable[i] --;
-				branchAndBound(copySolution, solutionSize, lowerBound + newLowerBound, newBandWidthAvailable, newCustomerSlotsAvailable);
+				branchAndBound(copySolution, solutionSize, newLowerBound, newBandWidthAvailable, newCustomerSlotsAvailable);
 			}
 		}
 
@@ -136,7 +168,7 @@ public class CFLP extends AbstractCFLP {
 		Main.printDebug("heuristicSolution " + solutionSize);
 		int[] newSolution = solution.clone();
 		int count = 0;
-
+		/*
 		Integer[] customers = new Integer[solution.length-solutionSize];
 		for (int i = 0; i < customers.length; i++) {
 			customers[i] = i+solutionSize;
@@ -144,12 +176,16 @@ public class CFLP extends AbstractCFLP {
 		Arrays.sort(customers, new Comparator<Integer>() {
 			@Override
 			public int compare(Integer o1, Integer o2) {
-				return Integer.compare(instance.bandwidthOf(o2), instance.bandwidthOf(o1));
+				return CFLP.compare(instance.bandwidthOf(o2), instance.bandwidthOf(o1));
 			}
 		});
-
-		out:for(int i : customers){
-			for(int facility : bestFacilitiesForCostumer.get(i)){
+*/
+		out:
+		for(int i : biggestCustomers){
+			if(i < solutionSize){
+				continue ;
+			}
+			for(int facility : bestFacilities[i]){
 				if(bandwidthAvailable[facility] != instance.maxBandwidth && customerSlotsAvailable[facility] > 0 &&
 						bandwidthAvailable[facility] > instance.bandwidthOf(i)){
 					bandwidthAvailable[facility] -= instance.bandwidthOf(i);
@@ -159,7 +195,7 @@ public class CFLP extends AbstractCFLP {
 					continue out;
 				}
 			}
-			for(int facility : bestFacilitiesForCostumer.get(i)){
+			for(int facility : bestFacilities[i]){
 				if(customerSlotsAvailable[facility] > 0 &&
 						bandwidthAvailable[facility] > instance.bandwidthOf(i)){
 					bandwidthAvailable[facility] -= instance.bandwidthOf(i);
@@ -174,6 +210,29 @@ public class CFLP extends AbstractCFLP {
 		}
 		return newSolution;
 	}
+
+
+	/**
+	 * copied from java source since we have to work with the super modern
+	 * version 1.6
+	 * Compares two {@code int} values numerically.
+	 * The value returned is identical to what would be returned by:
+	 * <pre>
+	 *    Integer.valueOf(x).compareTo(Integer.valueOf(y))
+	 * </pre>
+	 *
+	 * @param  x the first {@code int} to compare
+	 * @param  y the second {@code int} to compare
+	 * @return the value {@code 0} if {@code x == y};
+	 *         a value less than {@code 0} if {@code x < y}; and
+	 *         a value greater than {@code 0} if {@code x > y}
+	 * @since 1.7
+	 */
+	public static int compare(int x, int y) {
+		return (x < y) ? -1 : ((x == y) ? 0 : 1);
+	}
+
+
 
 
 }

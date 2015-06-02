@@ -174,7 +174,6 @@ public class Main {
 		}
 		
 		int objectiveValue = originalInstance.calcObjectiveValue(solution);
-
 		if (Math.abs(objectiveValue - upper_bound) > 0) {
 			bailOut("Die obere Schranke muss immer gleich der aktuell besten Loesung sein!");
 		}

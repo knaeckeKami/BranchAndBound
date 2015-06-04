@@ -11,7 +11,7 @@ import java.util.*;
  */
 public class CFLP extends AbstractCFLP {
 
-	private CFLPInstance instance;
+	private final CFLPInstance instance;
 
 	/**
 	 * this array contains the best facility for each customer
@@ -51,7 +51,7 @@ public class CFLP extends AbstractCFLP {
 			for(int j= 0; j < instance.getNumFacilities(); j++){
 				magicList.add(j);
 			}
-		
+
 			Collections.sort(magicList, new Comparator<Integer>() {
 				@Override
 				public int compare(Integer fac1, Integer fac2) {
@@ -107,10 +107,30 @@ public class CFLP extends AbstractCFLP {
 	}
 
 	/**
+	 * copied from java source since we have to work with the super modern
+	 * version 1.6
+	 * Compares two {@code int} values numerically.
+	 * The value returned is identical to what would be returned by:
+	 * <pre>
+	 *    Integer.valueOf(x).compareTo(Integer.valueOf(y))
+	 * </pre>
+	 *
+	 * @param x the first {@code int} to compare
+	 * @param y the second {@code int} to compare
+	 * @return the value {@code 0} if {@code x == y};
+	 * a value less than {@code 0} if {@code x < y}; and
+	 * a value greater than {@code 0} if {@code x > y}
+	 * @since 1.7
+	 */
+	private static int compare(int x, int y) {
+		return (x < y) ? -1 : ((x == y) ? 0 : 1);
+	}
+
+	/**
 	 * Diese Methode bekommt vom Framework maximal 30 Sekunden Zeit zur
 	 * Verfügung gestellt um eine gültige Lösung
 	 * zu finden.
-	 * 
+	 *
 	 * <p>
 	 * Fügen Sie hier Ihre Implementierung des Branch-and-Bound Algorithmus
 	 * ein.
@@ -126,11 +146,22 @@ public class CFLP extends AbstractCFLP {
 		int[] customerSlotsAvailable = instance.maxCustomers.clone();
 		Arrays.fill(solution, -1);
 		Arrays.fill(bandwidthAvailable, instance.maxBandwidth);
+		this.setUpperBound(solution.clone(), 0, bandwidthAvailable.clone(), customerSlotsAvailable.clone());
 		branchAndBound(solution, -1, 0 ,bandwidthAvailable, customerSlotsAvailable);
 
 
 	}
 
+	/**
+	 * calculates the optimal solution for this CFLP problem.
+	 * the current best solution and its cost can be queried with
+	 * the method getBestSolution, even if the calculation is still running.
+	 * @param solution        an empty or partial solution, the empty values must be < 0
+	 * @param solutionSize  the size of the partial solution or -1 if the solution is empty
+	 * @param costForPartialSolution the cost for the current partial solution or 0 if empty
+	 * @param bandwidthAvailable the free bandwidth for each facility
+	 * @param customerSlotsAvailable the free customer slots for each facility
+	 */
 	private void branchAndBound(int[] solution, int solutionSize,
 								int costForPartialSolution,  int[] bandwidthAvailable,
 								int[] customerSlotsAvailable){
@@ -140,9 +171,9 @@ public class CFLP extends AbstractCFLP {
 												solutionSize,
 												solution,
 												bandwidthAvailable,
-												customerSlotsAvailable);
+				customerSlotsAvailable);
 
-		if(!(getBestSolution() == null || getBestSolution().getUpperBound() > newLowerBound)) {
+		if (!(getBestSolution().getUpperBound() > newLowerBound)) {
 			//the solution is too bad, there is already a better one!
 			return;
 		}
@@ -161,7 +192,7 @@ public class CFLP extends AbstractCFLP {
 				//check if the branching is still a valid solution
 				if (customerSlotsAvailable[facility] > 0 && bandwidthAvailable[facility] >= instance.bandwidthOf(customer)) {
 					//calculate the new cost of the partial solution
-					int nextLowerBound = instance.distance(facility, customer)*instance.distanceCosts;
+					int nextLowerBound = realDistanceCosts[facility][customer];
 					if(bandwidthAvailable[facility] == instance.maxBandwidth){
 						nextLowerBound+= instance.openingCostsFor(facility);
 					}
@@ -171,15 +202,14 @@ public class CFLP extends AbstractCFLP {
 					bandwidthAvailable[facility] -= instance.bandwidthOf(customer);
 					customerSlotsAvailable[facility]--;
 					//now, finally, branch!
-					branchAndBound(solution, solutionSize, nextLowerBound+costForPartialSolution, bandwidthAvailable, customerSlotsAvailable);
+					branchAndBound(solution, solutionSize, nextLowerBound + costForPartialSolution, bandwidthAvailable, customerSlotsAvailable);
 					//reverse the adaption of the bandwidth and slots so the next branching
 					//is done with valid values
 					bandwidthAvailable[facility] += instance.bandwidthOf(customer);
 					customerSlotsAvailable[facility]++;
 				}
-			}
 		}
-
+	}
 
 	/**
 	 * CURRENTLY UNUSED BECAUSE IT IS SLOWER THAN PURE ENUMERATION
@@ -192,16 +222,14 @@ public class CFLP extends AbstractCFLP {
 	 * @param customerSlotsAvailable the number of free customer slots in each facilty
 	 * @return a valid heuristic solution or null
 	 */
-	private int[] heuristicSolution(int[] solution, int solutionSize, int[] bandwidthAvailable, int[] customerSlotsAvailable){
-
-
+	private int[] heuristicSolution(int[] solution, int solutionSize, int[] bandwidthAvailable, int[] customerSlotsAvailable) {
 		out:
-		for(int i = solutionSize; i < biggestCustomers.length; i++){
+		for (int i = solutionSize; i < biggestCustomers.length; i++) {
 
 			int customer = getCurrentCustomerStrat(i);
-			for(int facility : bestFacilities[customer]){
-				if(customerSlotsAvailable[facility] > 0 &&
-						bandwidthAvailable[facility] > instance.bandwidthOf(customer)){
+			for (int facility : bestFacilities[customer]) {
+				if (customerSlotsAvailable[facility] > 0 &&
+						bandwidthAvailable[facility] > instance.bandwidthOf(customer)) {
 					bandwidthAvailable[facility] -= instance.bandwidthOf(customer);
 					customerSlotsAvailable[facility]--;
 					//Main.printDebug("choose facility " + facility + " for customer " + i);
@@ -215,28 +243,6 @@ public class CFLP extends AbstractCFLP {
 		return solution;
 	}
 
-
-	/**
-	 * copied from java source since we have to work with the super modern
-	 * version 1.6
-	 * Compares two {@code int} values numerically.
-	 * The value returned is identical to what would be returned by:
-	 * <pre>
-	 *    Integer.valueOf(x).compareTo(Integer.valueOf(y))
-	 * </pre>
-	 *
-	 * @param  x the first {@code int} to compare
-	 * @param  y the second {@code int} to compare
-	 * @return the value {@code 0} if {@code x == y};
-	 *         a value less than {@code 0} if {@code x < y}; and
-	 *         a value greater than {@code 0} if {@code x > y}
-	 * @since 1.7
-	 */
-	public static int compare(int x, int y) {
-		return (x < y) ? -1 : ((x == y) ? 0 : 1);
-	}
-
-
 	/**
 	 * Returns the i_th customer in the current strategy for processing customers.
 	 * Because the sequence, in which the customers are processed, must be equal for the whole
@@ -246,13 +252,13 @@ public class CFLP extends AbstractCFLP {
 	 * @param i the i_th customer
 	 * @return the number of the i_th
 	 */
-	public final int getCurrentCustomerStrat(int i){
+	private final int getCurrentCustomerStrat(int i){
 		return biggestCustomers[i];
 	}
 
 
 	/**
-	 * calcultes a (pretty bad, but fast) lower bound for this solution
+	 * calculates a (pretty bad, but fast) lower bound for this solution
 	 * @param costForPartialSolution the cost of the partial solution
 	 * @param solutionSize the number of fixed entries in the solution
 	 * @param solution the partial solution
@@ -260,7 +266,7 @@ public class CFLP extends AbstractCFLP {
 	 * @param customerSlotsAvailable the available slots for each facility
 	 * @return a lower bound for this solutio
 	 */
-	public final int calculateLowerBound(int costForPartialSolution, int solutionSize, int[] solution, int[] bandwidthAvailable, int[] customerSlotsAvailable){
+	private int calculateLowerBound(int costForPartialSolution, int solutionSize, int[] solution, int[] bandwidthAvailable, int[] customerSlotsAvailable){
 
 		//berechne für solution untere schranke
 		int newLowerBound = costForPartialSolution;
@@ -285,5 +291,53 @@ public class CFLP extends AbstractCFLP {
 		}
 		return newLowerBound;
 	}
+
+
+	/**
+	 * returns an upper bound for this partial solution
+	 *
+	 * @param solution               partial solution
+	 * @param solutionSize           number of fixed entries
+	 * @param bandwidthAvailable     bandwidth for the facilities
+	 * @param customerSlotsAvailable available slots for the facilities
+	 * @return sideeffect: the upperbound in the instance gets set
+	 */
+	private int setUpperBound(int[] solution, int solutionSize, int[] bandwidthAvailable, int[] customerSlotsAvailable) {
+		/**
+		 * try to find a heurisitic solution, this will be the upper bound
+		 */
+		int[] heuristicSolution = heuristicSolution(solution, solutionSize, bandwidthAvailable, customerSlotsAvailable);
+		int cost = 0;
+		if (heuristicSolution != null) {
+			cost = instance.calcObjectiveValue(solution);
+			setSolution(cost, solution);
+		} else {
+			//assume worst case, every customer fits into the worst facility for him
+			for (int i = solutionSize; i < biggestCustomers.length; i++) {
+				int customer = getCurrentCustomerStrat(i);
+				solution[customer] = bestFacilities[customer][instance.getNumFacilities() - 1];
+			}
+		}
+
+		for (int i = 0; i < solution.length; i++) {
+			cost += instance.distance(solution[i], i) * instance.distanceCosts;
+		}
+		for (int i = 0; i < instance.getNumFacilities(); i++) {
+			cost += instance.openingCostsFor(i);
+		}
+		this.setSolution(cost, solution);
+		return cost;
+
+		/**
+		 * @TODO
+		 * Sie sollen den Kunden nicht mehrmals "komplett" zuweisen.
+		 * Sie können aber z.B. die Bandbreitenanforderung
+		 * eines Kunden anteilsmäßig auf zwei Facilities aufteilen
+		 * und damit z.B. die B Einheiten bei einer Facility voll ausschöpfen.
+
+		MfG AD-Team
+		 */
+	}
+
 
 }
